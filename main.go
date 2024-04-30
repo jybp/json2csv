@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -16,11 +17,11 @@ var input, output, delimiter string
 func init() {
 	flag.StringVar(&input, "i", "", "input json file path")
 	flag.StringVar(&output, "o", "", "output csv file path")
-	flag.StringVar(&delimiter, "delimiter", ",", "csv delimiter")
-	flag.Parse()
+	flag.StringVar(&delimiter, "delimiter", ";", "csv delimiter")
 }
 
 func main() {
+	flag.Parse()
 	if err := run(); err != nil {
 		log.Fatal(err)
 	}
@@ -45,12 +46,21 @@ func run() error {
 		if err := d.Decode(&el); err != nil {
 			return err
 		}
+		// Force a deterministic columns order.
+		var keys []string
 		for k := range el {
+			keys = append(keys, k)
+		}
+		slices.Sort(keys)
+		for _, k := range keys {
 			if !slices.Contains(columns, k) {
 				columns = append(columns, k)
 			}
 		}
 		for i, c := range columns {
+			el[c] = bytes.ReplaceAll(el[c], []byte("\n"), []byte(""))
+			el[c] = bytes.ReplaceAll(el[c], []byte("\r"), []byte(""))
+			el[c] = bytes.ReplaceAll(el[c], []byte("\t"), []byte(""))
 			if i == len(columns)-1 {
 				fmt.Fprintf(o, "%s\n", el[c])
 				break
